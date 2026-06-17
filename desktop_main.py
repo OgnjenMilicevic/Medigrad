@@ -76,18 +76,27 @@ def main():
 
     # Try a native OS window first. If no webview backend is available on this
     # machine, fall back to the default web browser so the app still works.
+    used_browser_fallback = False
     try:
         import webview  # pywebview
-        webview.create_window(
+        window = webview.create_window(
             "Datagrad MFUB Desktop",
             base_url,
             width=1280,
             height=860,
             min_size=(900, 600),
         )
+        start_time = time.time()
         webview.start()
+        # A near-instant return *with no windows registered* means no GUI
+        # backend ever initialised (rather than the user closing the window).
+        if (time.time() - start_time) < 1.0 and not getattr(webview, "windows", [window]):
+            raise RuntimeError("no usable native-window backend")
     except Exception as e:
+        used_browser_fallback = True
         sys.stderr.write(f"Native window unavailable ({e}); opening in browser.\n")
+
+    if used_browser_fallback:
         import webbrowser
         webbrowser.open(base_url)
         # Keep the process (and the server thread) alive while the browser is open.
