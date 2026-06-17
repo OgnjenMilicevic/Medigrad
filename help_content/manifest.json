@@ -1,0 +1,60 @@
+{
+  "help_structure": [
+    {
+      "category": "Getting Started",
+      "topics": [
+        { "name": "Uploading Data", "file": "uploading_data" },
+        { "name": "The Data Grid", "file": "data_grid" },
+        { "name": "Downloading & Exporting", "file": "downloading_exporting" }
+      ]
+    },
+    {
+      "category": "Foundational Concepts",
+      "topics": [
+        { "name": "Variables", "file": "variables" },
+        { "name": "Distributions", "file": "distributions" },
+        { "name": "Normal Distribution", "file": "normal_distribution" }
+      ]
+    },
+    {
+      "category": "Description",
+      "topics": [
+        { "name": "Descriptive Statistics", "file": "descriptive_statistics" },
+        { "name": "Summary Statistics (Describe)", "file": "describe" },
+        { "name": "Grouped Summary Statistics", "file": "grouped_summary" },
+        { "name": "Numerical QC Report", "file": "numerical_qc" }
+      ]
+    },
+    {
+      "category": "Correlation",
+      "topics": [
+        { "name": "Pearson Correlation", "file": "pearson_correlation" },
+        { "name": "Spearman Correlation", "file": "spearman_correlation" }
+      ]
+    },
+    {
+      "category": "Two-Group Tests",
+      "topics": [
+        { "name": "Independent t-test", "file": "independent_t_test" },
+        { "name": "Paired t-test", "file": "paired_t_test" },
+        { "name": "Mann-Whitney U", "file": "mann_whitney_u" },
+        { "name": "Wilcoxon Signed-Rank", "file": "wilcoxon_signed_rank" }
+      ]
+    },
+    {
+      "category": "Multi-Group Tests",
+      "topics": [
+        { "name": "One-way ANOVA", "file": "one_way_anova" },
+        { "name": "Kruskal-Wallis", "file": "kruskal_wallis" },
+        { "name": "Tukey HSD (post-hoc)", "file": "tukey_hsd" }
+      ]
+    },
+    {
+      "category": "Categorical Tests",
+      "topics": [
+        { "name": "Chi-square Test", "file": "chi_squared_test" },
+        { "name": "Fisher Exact Test", "file": "fisher_exact_test" }
+      ]
+    }
+  ]
+}

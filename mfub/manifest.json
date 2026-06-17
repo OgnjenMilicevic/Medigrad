@@ -1,0 +1,16 @@
+{
+  "title": "MFUB — Course Materials",
+  "intro": "Materials for the Medical Statistics course at the Faculty of Medicine, University of Belgrade (Medicinski fakultet Univerziteta u Beogradu). Add your own files to the 'mfub' folder and list them here.",
+  "items": [
+    {
+      "label": "Welcome / Course Information",
+      "type": "markdown",
+      "file": "welcome.md"
+    },
+    {
+      "label": "Department Website",
+      "type": "link",
+      "url": "https://med.bg.ac.rs/"
+    }
+  ]
+}

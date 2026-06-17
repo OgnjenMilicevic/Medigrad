@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# PyInstaller build output
+build/
+dist/
+*.spec.bak
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Local packaging output
+*.zip
+*.tar.gz
+*.dmg
+Output/

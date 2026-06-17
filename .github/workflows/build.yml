@@ -1,0 +1,119 @@
+name: Build Datagrad (all platforms)
+
+# Runs when you push a version tag like v1.0, v1.1, v2.0 ...
+# Also runnable on demand from the Actions tab (workflow_dispatch).
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write        # needed to create the Release and upload assets
+
+jobs:
+  build:
+    name: Build on ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows-x64
+            artifact: Datagrad-Windows-x64
+          - os: ubuntu-22.04
+            label: Linux-x64
+            artifact: Datagrad-Linux-x64
+          - os: macos-13          # Intel runner
+            label: macOS-Intel
+            artifact: Datagrad-macOS-Intel
+          - os: macos-14          # Apple Silicon (M-series) runner
+            label: macOS-AppleSilicon
+            artifact: Datagrad-macOS-AppleSilicon
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Linux desktop (WebKitGTK) dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-0 libwebkit2gtk-4.1-0 libwebkit2gtk-4.1-dev \
+            gir1.2-webkit2-4.1 python3-gi python3-gi-cairo \
+            libcairo2-dev libgirepository1.0-dev pkg-config
+          pip install PyGObject
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+        shell: bash
+
+      - name: Build with PyInstaller
+        run: pyinstaller Datagrad.spec --noconfirm
+        shell: bash
+
+      # ---- Package: Windows -> zip of the one-folder app ----
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd dist
+          Compress-Archive -Path Datagrad -DestinationPath ../${{ matrix.artifact }}.zip
+        shell: pwsh
+
+      # ---- Package: Linux -> tar.gz of the one-folder app ----
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd dist
+          tar -czf ../${{ matrix.artifact }}.tar.gz Datagrad
+        shell: bash
+
+      # ---- Package: macOS -> dmg containing Datagrad.app ----
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          hdiutil create -volname Datagrad \
+            -srcfolder Datagrad.app \
+            -ov -format UDZO \
+            ../${{ matrix.artifact }}.dmg
+        shell: bash
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.zip
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.dmg
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Only make a Release when a version tag was pushed.
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release with all platform builds
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

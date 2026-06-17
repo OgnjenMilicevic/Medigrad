@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datagrad MFUB Desktop</title>
+    <link rel="stylesheet" href="/vendor/tailwind.min.css" />
+    <link rel="stylesheet" href="/vendor/tabulator.min.css" />
+    <script src="/vendor/tabulator.min.js"></script>
+    <script src="/vendor/plotly-2.32.0.min.js"></script>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <!-- Main application structure -->
+    <div id="drop-overlay" class="bg-black bg-opacity-50"><div class="text-white text-2xl font-bold border-2 border-dashed border-white p-8 rounded-lg">Drop file to upload</div></div>
+    <div id="global-tooltip"></div>
+
+    <div class="flex flex-col h-screen">
+        <!-- Menu Bar -->
+        <nav class="bg-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4 flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <div class="dropdown relative"><span class="menu-item inline-block">File</span>
+                        <div class="dropdown-content">
+                            <a href="#" id="new-blank-dataset" class="menu-item block">New Blank Dataset...</a>
+                            <a href="#" id="set-session-id" class="menu-item block">Set Session ID...</a>
+                            <div class="border-t my-1"></div>
+                            <label for="file-upload" class="menu-item block">Upload File...</label>
+                            <input type="file" id="file-upload" class="hidden" accept=".csv,.xls,.xlsx,.sav,.pkl">
+                            <div class="dropdown-submenu relative">
+                                <a href="#" class="menu-item block">Load Example Data ▸</a>
+                                <div class="submenu-content" id="examples-submenu">
+                                    <a href="#" class="menu-item block" data-example="clinical_trial">Clinical Trial</a>
+                                    <a href="#" class="menu-item block" data-example="teaching_methods">Teaching Methods</a>
+                                    <a href="#" class="menu-item block" data-example="health_survey">Health Survey</a>
+                                </div>
+                            </div>
+                            <div class="border-t my-1"></div>
+                            <a href="#" id="download-csv" class="menu-item block">Download as CSV</a>
+                            <a href="#" id="download-xlsx" class="menu-item block">Download as XLSX</a>
+                            <div class="border-t my-1"></div>
+                            <a href="#" id="show-log-location" class="menu-item block">Show Activity Log Folder</a>
+                        </div>
+                    </div>
+                    <div class="dropdown relative"><span class="menu-item inline-block">Description</span>
+                        <div class="dropdown-content">
+                            <a href="#" id="desc-qc" class="menu-item block">Numerical QC Report</a>
+                            <a href="#" id="desc-stats" class="menu-item block">Descriptive Statistics...</a>
+                            <div class="border-t my-1"></div>
+                            <a href="#" id="desc-diagnostic" class="menu-item block">Diagnostic Test (Sens/Spec)...</a>
+                        </div>
+                    </div>
+                    <div class="dropdown group relative">
+                        <span class="menu-item inline-block cursor-pointer py-2">Analysis</span>
+                        <div class="absolute left-[-100px] top-full pt-2 hidden group-hover:block z-[9999]">
+                            <div class="w-[560px] max-h-[85vh] overflow-y-auto grid grid-cols-2 gap-8 rounded-lg bg-white p-6 shadow-2xl border border-gray-100">
+                                <div>
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Correlation &amp; Regression</h3>
+                                    <a href="#" id="analysis-correlation" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Correlation...</a>
+                                    <a href="#" id="analysis-linear-regression" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Linear Regression...</a>
+                                    <a href="#" id="analysis-chi-square" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Chi-square Test...</a>
+                                    <a href="#" id="analysis-chi-square-gof" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Chi-square Goodness-of-Fit...</a>
+                                    <a href="#" id="analysis-fisher" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Fisher Exact Test...</a>
+                                    <a href="#" id="analysis-mcnemar" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">McNemar Test (paired)...</a>
+
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 mt-5">Two-Group Tests</h3>
+                                    <a href="#" id="analysis-ttest-ind" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Independent t-test...</a>
+                                    <a href="#" id="analysis-ttest-paired" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Paired t-test...</a>
+                                    <a href="#" id="analysis-mannwhitney" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Mann-Whitney U...</a>
+                                    <a href="#" id="analysis-wilcoxon" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Wilcoxon Signed-Rank...</a>
+                                </div>
+                                <div>
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">One-Sample Tests</h3>
+                                    <a href="#" id="analysis-ttest-one-sample" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">One-sample t-test...</a>
+                                    <a href="#" id="analysis-sign-test" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">One-sample Sign Test...</a>
+
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 mt-5">Multi-Group Tests</h3>
+                                    <a href="#" id="analysis-anova" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">One-way ANOVA...</a>
+                                    <a href="#" id="analysis-kruskal" class="block text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded transition-colors">Kruskal-Wallis...</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dropdown relative"><span class="menu-item inline-block">MFUB</span>
+                        <div class="dropdown-content" id="mfub-menu">
+                            <a href="#" class="menu-item block text-gray-400">Loading…</a>
+                        </div>
+                    </div>
+                    <div class="dropdown relative"><span class="menu-item inline-block">Help</span>
+                        <div class="dropdown-content">
+                            <a href="#" id="help-search" class="menu-item block">Search Topics...</a>
+                            <div class="border-t my-1"></div>
+                            <a href="#" id="help-about" class="menu-item block">About</a>
+                        </div>
+                    </div>
+                </div>
+                <!-- Editable Filename/Title + institutional logos -->
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-3 text-sm text-gray-700 bg-gray-50 px-2 py-1 rounded border border-gray-200" id="reality-toggle-wrapper" style="display: none;">
+                        <input type="checkbox" id="reality-toggle" checked class="mr-1 cursor-pointer">
+                        <label for="reality-toggle" class="font-medium cursor-pointer">Show Imputed</label>
+                        <span class="border-l border-gray-300 h-4"></span>
+                        <button id="impute-accept-btn" class="px-2 py-0.5 rounded bg-green-600 text-white font-medium hover:bg-green-700 text-xs">Accept</button>
+                        <button id="impute-revert-btn" class="px-2 py-0.5 rounded bg-red-500 text-white font-medium hover:bg-red-600 text-xs">Revert</button>
+                    </div>
+                    <div id="session-badge">Session: (not set)</div>
+                    <div id="filter-summary" class="text-sm text-gray-500">Rows: 0/0 active • 0 excluded • 0 rules</div>
+                    <div id="filename-container" class="flex items-center" style="display: none;">
+                        <label for="current-filename" class="text-sm font-medium text-gray-500 mr-2">Title:</label>
+                        <input type="text" id="current-filename" class="text-sm border-gray-300 rounded-md shadow-sm p-1">
+                    </div>
+                    <div class="brand-plate" title="Katedra za medicinsku statistiku i informatiku — Medicinski fakultet Univerziteta u Beogradu">
+                        <img src="/assets/logo_katedra.png" alt="Katedra za medicinsku statistiku i informatiku" class="brand-logo">
+                        <span class="brand-divider"></span>
+                        <img src="/assets/logo_fakultet.png" alt="Medicinski fakultet Univerziteta u Beogradu" class="brand-logo">
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-grow p-4 flex flex-col">
+            <div id="data-grid-container" class="flex-grow bg-white rounded-lg shadow relative" style="display: none;"><div id="data-grid"></div></div>
+            <div id="welcome-message" class="flex items-center justify-center h-full text-gray-500"><p>Upload a file to begin.</p></div>
+        </main>
+        <div id="status-bar">Ready</div>
+
+        <!-- Collapsible bottom panels: live activity log + Python code -->
+        <div id="bottom-panels">
+            <details id="log-panel" class="bottom-panel">
+                <summary>📋 Activity Log</summary>
+                <div class="bottom-panel-body">
+                    <div class="bottom-panel-toolbar">
+                        <button id="log-refresh" class="panel-btn">Refresh</button>
+                        <span class="panel-hint">Most recent actions, newest at the bottom.</span>
+                    </div>
+                    <pre id="log-content" class="panel-pre">Open to load…</pre>
+                </div>
+            </details>
+            <details id="code-panel" class="bottom-panel">
+                <summary>🐍 Python Code (last analysis)</summary>
+                <div class="bottom-panel-body">
+                    <div class="bottom-panel-toolbar">
+                        <button id="code-copy" class="panel-btn">Copy</button>
+                        <span class="panel-hint">The equivalent pandas / SciPy code for the analysis you just ran.</span>
+                    </div>
+                    <pre id="code-content" class="panel-pre">Run an analysis to see the equivalent Python code here.</pre>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="param-modal" class="modal"><div class="modal-content"><span class="close-button" id="param-modal-close">&times;</span><h2 id="param-modal-title" class="text-2xl font-bold mb-4">Parameters</h2><div id="param-modal-body" class="modal-body"></div></div></div>
+    <div id="report-modal" class="modal"><div class="modal-content"><span class="close-button" id="report-modal-close">&times;</span><h2 id="report-modal-title" class="text-2xl font-bold mb-4">Report</h2><div id="report-modal-body" class="modal-body"></div></div></div>
+    <div id="plot-modal" class="modal"><div class="modal-content"><span class="close-button" id="plot-modal-close">&times;</span><h2 class="text-2xl font-bold mb-4">Plot</h2><div id="plot-modal-body" class="modal-body flex-grow min-h-0"><div id="plot-div" class="flex-grow w-full" style="min-height:400px;"></div></div></div></div>
+    <div id="help-panel" class="fixed top-0 right-[-450px] w-[400px] h-full bg-white shadow-lg z-[1500] transition-all duration-300 flex flex-col"><div class="p-4 border-b flex justify-between items-center"><h2 id="help-panel-title" class="text-xl font-bold">Help</h2><button id="help-panel-close" class="text-2xl font-bold text-gray-500 hover:text-gray-800">&times;</button></div><div id="help-panel-body" class="p-4 overflow-y-auto prose"></div></div>
+    <div id="encode-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-button" id="encode-modal-close">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">Encode Column</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Column(s) to Encode</label>
+                    <select
+                    id="encode-col-select"
+                    multiple
+                    size="6"
+                    class="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                    ></select>
+                    <p class="text-xs text-gray-500 mt-1">
+                    Hold Cmd/Ctrl or Shift to select multiple columns.
+                    </p>
+                </div>
+                <div>
+                <label class="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                    type="checkbox"
+                    id="encode-drop-original"
+                    class="h-4 w-4"
+                    >
+                    <span>Delete original column(s) after encoding</span>
+                </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Encoding Method</label>
+                    <select id="encode-method-select" class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                        <option value="one-hot">One-Hot (All levels)</option>
+                        <option value="dummy">Dummy (N-1 levels)</option>
+                        <option value="frequency">Frequency (Percentage representation)</option>
+                        <option value="ordinal">Ordinal (Integer mapped)</option>
+                        <option value="cumulative">Cumulative Ordinal (Step-wise binaries)</option>
+                    </select>
+                </div>
+
+                <div id="encode-order-container" style="display: none;">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Drag to Set Order (Lowest to Highest)</label>
+                    <ul id="encode-sortable-list" class="border border-gray-300 rounded-md bg-gray-50 p-2 space-y-1 min-h-[100px]">
+                        </ul>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end border-t pt-4">
+                <button id="encode-run-btn" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-md hover:bg-blue-700">Apply Encoding</button>
+            </div>
+            <div id="encode-direction-container" style="display: none;" class="pt-2">
+                <label class="block text-sm font-medium text-gray-700">Reference Category / Direction</label>
+                <select id="encode-direction-select" class="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-gray-50">
+                    <option value="first">Omit First Level (Cumulative ≥ from level upward)</option>
+                    <option value="last">Omit Last Level (Cumulative ≤ up to level)</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">This ensures N-1 columns are created to avoid multicollinearity.</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/js/main.js"></script>
+</body>
+</html>
