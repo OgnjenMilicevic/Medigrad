@@ -316,7 +316,8 @@ def create_blueprint(store):
             ]
 
         elif action == 'remove_multiple':
-            removed_names = data.get('names', [])
+            removed_names = [n for n in data.get('names', [])
+                             if n is not None and str(n).strip() != '']
             if not isinstance(removed_names, list) or not removed_names:
                 return jsonify({"error": "No columns provided for removal."}), 400
             missing = [n for n in removed_names if n not in app_state.current_df.columns]
@@ -334,9 +335,102 @@ def create_blueprint(store):
         app_state.rebuild_exclusion_state()
         return jsonify({"success": True, **app_state.get_table_data()})
 
-    # ------------------------------------------------------------------
-    # Row deletion
-    # ------------------------------------------------------------------
+    @bp.route('/add-column-from-text', methods=['POST'])
+    def add_column_from_text():
+        """Split a pasted delimited string into a new column (one value per row).
+
+        If no dataset is loaded, a new one is created from this single column.
+        If the pasted column is longer than the current data, all existing
+        columns are extended with blanks; if shorter, the new column is padded
+        with blanks so every column stays the same length.
+        """
+        import re as _re
+        app_state = resolve_state(store)
+        data = request.get_json() or {}
+
+        col_name = (data.get('name') or '').strip()
+        text = data.get('text', '')
+        delimiter = data.get('delimiter', ',')
+        trim = data.get('trim', True)
+        drop_empty = data.get('drop_empty', False)
+        as_numeric = data.get('as_numeric', False)
+
+        if not col_name:
+            return jsonify({"error": "Column name cannot be empty."}), 400
+        if text is None or str(text).strip() == '':
+            return jsonify({"error": "Paste some delimited values first."}), 400
+
+        text = str(text)
+
+        # Split. "whitespace" / "newline" are named options; otherwise the
+        # literal delimiter string is used. \t and \n escapes are honoured.
+        if delimiter in ('whitespace', 'ws'):
+            tokens = _re.split(r'\s+', text.strip())
+        elif delimiter in ('newline', 'lines', '\n'):
+            tokens = text.splitlines()
+        else:
+            d = delimiter.replace('\\t', '\t').replace('\\n', '\n')
+            if d == '':
+                d = ','
+            # Split on the delimiter, but also allow values to be on separate
+            # lines: normalise newlines to the delimiter first.
+            normalised = text.replace('\r\n', '\n').replace('\r', '\n')
+            normalised = normalised.replace('\n', d)
+            tokens = normalised.split(d)
+
+        if trim:
+            tokens = [t.strip() for t in tokens]
+        if drop_empty:
+            tokens = [t for t in tokens if t != '']
+
+        if len(tokens) == 0:
+            return jsonify({"error": "No values found after splitting."}), 400
+
+        # Optional numeric conversion (non-numeric -> error so the user knows).
+        if as_numeric:
+            converted = pd.to_numeric(pd.Series(tokens), errors='coerce')
+            bad = [tokens[i] for i in range(len(tokens)) if pd.isna(converted.iloc[i]) and tokens[i] != '']
+            if bad:
+                preview = ', '.join(repr(b) for b in bad[:5])
+                return jsonify({"error": f"These values aren't numeric: {preview}"}), 400
+            new_values = converted
+        else:
+            new_values = pd.Series(tokens, dtype=object)
+
+        try:
+            if not app_state.has_data:
+                # Build a fresh dataset from this single column.
+                df = pd.DataFrame({col_name: new_values.values})
+                app_state.load(df, name="pasted")
+            else:
+                df = app_state.current_df
+                if col_name in df.columns:
+                    return jsonify({"error": f"A column named '{col_name}' already exists."}), 400
+                n_existing = len(df)
+                n_new = len(new_values)
+                if n_new > n_existing:
+                    # Extend existing columns with blank rows.
+                    df = df.reindex(range(n_new)).reset_index(drop=True)
+                    df[col_name] = new_values.values
+                    app_state.current_df = df
+                    app_state._reset_exclusion_state(len(df))
+                else:
+                    # Pad the new column to match existing length.
+                    padded = list(new_values.values) + [pd.NA] * (n_existing - n_new)
+                    df[col_name] = padded
+                app_state.current_df = df
+
+            activity_log.record(action="add_column_from_text", method=col_name,
+                                payload={"rows": int(len(new_values)),
+                                         "delimiter": delimiter,
+                                         "numeric": bool(as_numeric)},
+                                session_id=data.get("session_id"))
+            app_state.rebuild_exclusion_state()
+            return jsonify(json_safe({"success": True, **app_state.get_table_data()}))
+        except Exception:
+            from flask import current_app
+            current_app.logger.exception("Failed to add column from text")
+            return jsonify({"error": "Could not add the column."}), 500
 
     @bp.route('/delete-rows', methods=['POST'])
     def delete_rows():

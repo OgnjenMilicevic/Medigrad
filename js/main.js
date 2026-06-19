@@ -17,6 +17,7 @@ import {
   getSessionId,
   loadExample,
   newBlankDataset,
+  addColumnFromText,
   getMfubManifest,
   getMfubMarkdown,
   getLogTail,
@@ -704,6 +705,93 @@ bindMenuClick('new-blank-dataset', async () => {
     updateStatus(`Error: ${error.message}`, true);
   }
 });
+
+// --- Add Column from Text: paste delimited values -> new column ---
+(function setupAddColumnModal() {
+  const modal = document.getElementById('addcol-modal');
+  if (!modal) return;
+  const nameEl = document.getElementById('addcol-name');
+  const delimEl = document.getElementById('addcol-delim');
+  const customEl = document.getElementById('addcol-delim-custom');
+  const textEl = document.getElementById('addcol-text');
+  const numericEl = document.getElementById('addcol-numeric');
+  const trimEl = document.getElementById('addcol-trim');
+  const dropEmptyEl = document.getElementById('addcol-dropempty');
+  const previewEl = document.getElementById('addcol-preview');
+
+  function effectiveDelimiter() {
+    if (delimEl.value === 'custom') return customEl.value || ',';
+    return delimEl.value;
+  }
+
+  function splitPreview() {
+    const text = textEl.value;
+    if (!text.trim()) { previewEl.textContent = ''; return; }
+    let d = effectiveDelimiter();
+    let tokens;
+    if (d === 'whitespace') tokens = text.trim().split(/\s+/);
+    else if (d === 'newline') tokens = text.split(/\r?\n/);
+    else {
+      d = d.replace('\\t', '\t');
+      tokens = text.replace(/\r?\n/g, d).split(d);
+    }
+    if (trimEl.checked) tokens = tokens.map(t => t.trim());
+    if (dropEmptyEl.checked) tokens = tokens.filter(t => t !== '');
+    previewEl.textContent = `Will create ${tokens.length} value(s). Preview: ${tokens.slice(0, 6).join(' | ')}${tokens.length > 6 ? ' …' : ''}`;
+  }
+
+  function open() {
+    nameEl.value = '';
+    textEl.value = '';
+    delimEl.value = ',';
+    customEl.style.display = 'none';
+    customEl.value = '';
+    numericEl.checked = false;
+    trimEl.checked = true;
+    dropEmptyEl.checked = false;
+    previewEl.textContent = '';
+    modal.style.display = 'block';
+    setTimeout(() => nameEl.focus(), 50);
+  }
+  function close() { modal.style.display = 'none'; }
+
+  delimEl.addEventListener('change', () => {
+    customEl.style.display = delimEl.value === 'custom' ? 'block' : 'none';
+    splitPreview();
+  });
+  [customEl, textEl, trimEl, dropEmptyEl].forEach(el =>
+    el.addEventListener('input', splitPreview));
+
+  document.getElementById('addcol-modal-close').addEventListener('click', close);
+  document.getElementById('addcol-cancel').addEventListener('click', close);
+
+  document.getElementById('addcol-submit').addEventListener('click', async () => {
+    const name = nameEl.value.trim();
+    if (!name) { updateStatus('Enter a column name.', true); nameEl.focus(); return; }
+    if (!textEl.value.trim()) { updateStatus('Paste some values first.', true); textEl.focus(); return; }
+    updateStatus('Adding column...');
+    try {
+      const result = await addColumnFromText({
+        name,
+        text: textEl.value,
+        delimiter: effectiveDelimiter(),
+        trim: trimEl.checked,
+        drop_empty: dropEmptyEl.checked,
+        as_numeric: numericEl.checked,
+      });
+      gridManager.setImputationState([]);
+      gridManager.toggleImputedData(true);
+      updateTable(result);
+      createDatasetSession({ headers: result.headers || [], filename: getCurrentDatasetSession()?.filename || 'untitled' });
+      close();
+      updateStatus(`Column "${name}" added.`);
+    } catch (error) {
+      updateStatus(`Error: ${error.message}`, true);
+    }
+  });
+
+  bindMenuClick('add-column-text', open);
+})();
 
 // --- Session ID (student name / number), stamped on every logged action ---
 function updateSessionBadge() {

@@ -151,6 +151,20 @@ export async function newBlankDataset({ rows, cols, column_names }) {
 }
 
 /**
+ * Add a new column by splitting a pasted delimited string.
+ */
+export async function addColumnFromText({ name, text, delimiter, trim, drop_empty, as_numeric }) {
+  return requestJson('/add-column-from-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name, text, delimiter, trim, drop_empty, as_numeric,
+      session_id: _sessionId || undefined,
+    }),
+  }, 'Could not add the column.');
+}
+
+/**
  * Fetch the list of built-in example datasets.
  */
 export async function listExamples() {

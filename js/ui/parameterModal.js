@@ -489,6 +489,129 @@ function extractInteractions(container) {
 }
 
 // ---------------------------------------------------------------------------
+// Search + chips multi-select widget. Each widget is backed by a hidden
+// <select multiple> (same id), which holds the real selection so existing
+// value-collection code is unchanged. The chips UI drives that select.
+// ---------------------------------------------------------------------------
+
+function bindChipsMultiselects(scopeEl) {
+  const widgets = (scopeEl || document).querySelectorAll('.chips-multiselect');
+  widgets.forEach(widget => {
+    const hidden = widget.querySelector('.chips-hidden-select');
+    const chipsBox = widget.querySelector('.chips-box');
+    const chipsSelected = widget.querySelector('.chips-selected');
+    const input = widget.querySelector('.chips-input');
+    const dropdown = widget.querySelector('.chips-dropdown');
+    if (!hidden || !chipsSelected || !input || !dropdown) return;
+
+    const allOptions = Array.from(hidden.options).map(o => o.value);
+
+    function selectedValues() {
+      return Array.from(hidden.selectedOptions).map(o => o.value);
+    }
+
+    function setSelected(value, on) {
+      const opt = Array.from(hidden.options).find(o => o.value === value);
+      if (opt) opt.selected = on;
+      // Notify any showIf listeners that depend on this field.
+      hidden.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function renderChips() {
+      chipsSelected.innerHTML = '';
+      selectedValues().forEach(val => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.innerHTML = `${escapeHtml(val)}<button type="button" class="chip-remove" aria-label="Remove">&times;</button>`;
+        chip.querySelector('.chip-remove').addEventListener('click', (e) => {
+          e.stopPropagation();
+          setSelected(val, false);
+          renderChips();
+          renderDropdown(input.value);
+        });
+        chipsSelected.appendChild(chip);
+      });
+    }
+
+    function renderDropdown(filterText) {
+      const ft = (filterText || '').trim().toLowerCase();
+      const chosen = new Set(selectedValues());
+      const matches = allOptions.filter(o =>
+        !chosen.has(o) && o.toLowerCase().includes(ft)
+      );
+      dropdown.innerHTML = '';
+      if (matches.length === 0) {
+        dropdown.hidden = true;
+        return;
+      }
+      matches.forEach((opt, idx) => {
+        const item = document.createElement('div');
+        item.className = 'chips-option';
+        item.textContent = opt;
+        item.dataset.value = opt;
+        if (idx === 0) item.classList.add('active');
+        item.addEventListener('mousedown', (e) => {
+          // mousedown (not click) so it fires before input blur
+          e.preventDefault();
+          setSelected(opt, true);
+          input.value = '';
+          renderChips();
+          renderDropdown('');
+          input.focus();
+        });
+        dropdown.appendChild(item);
+      });
+      dropdown.hidden = false;
+    }
+
+    function moveActive(dir) {
+      const items = Array.from(dropdown.querySelectorAll('.chips-option'));
+      if (items.length === 0) return;
+      let i = items.findIndex(el => el.classList.contains('active'));
+      if (i >= 0) items[i].classList.remove('active');
+      i = (i + dir + items.length) % items.length;
+      items[i].classList.add('active');
+      items[i].scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('input', () => renderDropdown(input.value));
+    input.addEventListener('focus', () => renderDropdown(input.value));
+    chipsBox.addEventListener('click', () => input.focus());
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveActive(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(-1); }
+      else if (e.key === 'Enter') {
+        const active = dropdown.querySelector('.chips-option.active');
+        if (active && !dropdown.hidden) {
+          e.preventDefault();
+          setSelected(active.dataset.value, true);
+          input.value = '';
+          renderChips();
+          renderDropdown('');
+        }
+      } else if (e.key === 'Backspace' && input.value === '') {
+        const vals = selectedValues();
+        if (vals.length) {
+          setSelected(vals[vals.length - 1], false);
+          renderChips();
+          renderDropdown('');
+        }
+      } else if (e.key === 'Escape') {
+        dropdown.hidden = true;
+      }
+    });
+
+    // Hide dropdown when focus leaves the widget.
+    document.addEventListener('click', (e) => {
+      if (!widget.contains(e.target)) dropdown.hidden = true;
+    });
+
+    renderChips();
+  });
+}
+
+// ---------------------------------------------------------------------------
 
 function renderField(field, headers, savedState = {}) {
   savedState = savedState || {}; // extra safety
@@ -563,6 +686,32 @@ function renderField(field, headers, savedState = {}) {
           .pg-card.pg-active { border-color:#2563eb !important; box-shadow:0 0 0 1px #2563eb33; }
           .pg-card:hover { border-color:#93c5fd; }
         </style>
+      </div>
+    `;
+  }
+
+  if (field.type === 'select_headers' && field.multiple) {
+    // Search + chips multi-select. A hidden <select multiple> with the same id
+    // holds the actual selection so the existing value-collection code keeps
+    // working unchanged; the chips UI just drives that hidden select.
+    const selectedValues = Array.isArray(value) ? value.filter(v => headers.includes(v)) : [];
+    const hiddenOptions = headers
+      .map(h => `<option value="${escapeHtml(h)}"${selectedValues.includes(h) ? ' selected' : ''}>${escapeHtml(h)}</option>`)
+      .join('');
+    const placeholder = field.optional
+      ? 'Type to search… (leave empty to use all)'
+      : 'Type to search and add…';
+    return `
+      <div class="param-field space-y-1" data-field-id="${field.id}">
+        ${label}
+        <div class="chips-multiselect" data-chips-for="${field.id}">
+          <select id="${field.id}" multiple class="chips-hidden-select">${hiddenOptions}</select>
+          <div class="chips-box">
+            <span class="chips-selected"></span>
+            <input type="text" class="chips-input" placeholder="${escapeHtml(placeholder)}" autocomplete="off">
+          </div>
+          <div class="chips-dropdown" hidden></div>
+        </div>
       </div>
     `;
   }
@@ -690,7 +839,12 @@ function buildPayload(config) {
     } else if (field.type === 'number') {
       value = el.value === '' ? null : parseFloat(el.value);
     } else if (field.multiple) {
-      value = Array.from(el.selectedOptions).map(opt => opt.value);
+      // Drop the empty-string "None" option (and any blank) so an unselected
+      // or None-selected multi-select sends [] rather than [""], which the
+      // backend treats as "use all applicable columns".
+      value = Array.from(el.selectedOptions)
+        .map(opt => opt.value)
+        .filter(v => v !== null && String(v).trim() !== '');
     } else {
       value = el.value;
 
@@ -953,6 +1107,7 @@ export function createParameterModal({
       bindLevelToggles(bodyEl);
       bindRandomEffectsBuilder(bodyEl, headers);
       bindInteractionBuilder(bodyEl, headers);
+      bindChipsMultiselects(bodyEl);
 
       const advancedBtn = bodyEl.querySelector('#toggle-advanced-btn');
       const advancedSections = bodyEl.querySelector('#advanced-sections');

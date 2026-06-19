@@ -23,6 +23,7 @@
                     <div class="dropdown relative"><span class="menu-item inline-block">File</span>
                         <div class="dropdown-content">
                             <a href="#" id="new-blank-dataset" class="menu-item block">New Blank Dataset...</a>
+                            <a href="#" id="add-column-text" class="menu-item block">Add Column from Text...</a>
                             <a href="#" id="set-session-id" class="menu-item block">Set Session ID...</a>
                             <div class="border-t my-1"></div>
                             <label for="file-upload" class="menu-item block">Upload File...</label>
@@ -154,6 +155,46 @@
     <div id="param-modal" class="modal"><div class="modal-content"><span class="close-button" id="param-modal-close">&times;</span><h2 id="param-modal-title" class="text-2xl font-bold mb-4">Parameters</h2><div id="param-modal-body" class="modal-body"></div></div></div>
     <div id="report-modal" class="modal"><div class="modal-content"><span class="close-button" id="report-modal-close">&times;</span><h2 id="report-modal-title" class="text-2xl font-bold mb-4">Report</h2><div id="report-modal-body" class="modal-body"></div></div></div>
     <div id="plot-modal" class="modal"><div class="modal-content"><span class="close-button" id="plot-modal-close">&times;</span><h2 class="text-2xl font-bold mb-4">Plot</h2><div id="plot-modal-body" class="modal-body flex-grow min-h-0"><div id="plot-div" class="flex-grow w-full" style="min-height:400px;"></div></div></div></div>
+
+    <div id="addcol-modal" class="modal">
+      <div class="modal-content" style="max-width:600px;">
+        <span class="close-button" id="addcol-modal-close">&times;</span>
+        <h2 class="text-2xl font-bold mb-4">Add Column from Text</h2>
+        <div class="modal-body space-y-3">
+          <div>
+            <label for="addcol-name" class="block text-sm font-medium text-gray-700">Column name</label>
+            <input type="text" id="addcol-name" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="e.g. measurements">
+          </div>
+          <div>
+            <label for="addcol-delim" class="block text-sm font-medium text-gray-700">Delimiter</label>
+            <select id="addcol-delim" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm">
+              <option value=",">Comma  ,</option>
+              <option value=";">Semicolon  ;</option>
+              <option value="\t">Tab</option>
+              <option value="whitespace">Any whitespace</option>
+              <option value="newline">New line (one value per line)</option>
+              <option value="|">Pipe  |</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <input type="text" id="addcol-delim-custom" class="mt-2 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="Type a custom delimiter" style="display:none;">
+          </div>
+          <div>
+            <label for="addcol-text" class="block text-sm font-medium text-gray-700">Paste the delimited values</label>
+            <textarea id="addcol-text" rows="5" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm font-mono text-sm" placeholder="e.g. 12, 15, 9, 22, 18"></textarea>
+          </div>
+          <div class="flex flex-wrap gap-4 text-sm text-gray-700">
+            <label class="flex items-center gap-1"><input type="checkbox" id="addcol-numeric"> Treat as numbers</label>
+            <label class="flex items-center gap-1"><input type="checkbox" id="addcol-trim" checked> Trim spaces</label>
+            <label class="flex items-center gap-1"><input type="checkbox" id="addcol-dropempty"> Drop empty values</label>
+          </div>
+          <p id="addcol-preview" class="text-xs text-gray-500"></p>
+          <div class="flex justify-end gap-2 pt-2">
+            <button id="addcol-cancel" class="px-3 py-1.5 rounded border border-gray-300 text-sm">Cancel</button>
+            <button id="addcol-submit" class="px-3 py-1.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">Add Column</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="help-panel" class="fixed top-0 right-[-450px] w-[400px] h-full bg-white shadow-lg z-[1500] transition-all duration-300 flex flex-col"><div class="p-4 border-b flex justify-between items-center"><h2 id="help-panel-title" class="text-xl font-bold">Help</h2><button id="help-panel-close" class="text-2xl font-bold text-gray-500 hover:text-gray-800">&times;</button></div><div id="help-panel-body" class="p-4 overflow-y-auto prose"></div></div>
     <div id="encode-modal" class="modal">
         <div class="modal-content" style="max-width: 500px;">

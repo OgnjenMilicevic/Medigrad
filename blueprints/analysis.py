@@ -17,6 +17,34 @@ from serializers import json_safe, df_to_json
 from blueprints._session import resolve_state
 
 
+def _sanitize_payload(payload):
+    """Clean a request payload coming from the UI before it reaches analysis
+    code. Multi-selects in the parameter modal include a "None" option whose
+    value is an empty string, so an unselected multi-select arrives as [""].
+    Left alone, [""] is a non-empty list containing a bogus column name and
+    breaks methods that should treat "nothing selected" as "use all columns".
+
+    For every list value we drop blank/None entries; if the list becomes empty
+    the key is removed so downstream `.get(key)` returns None and the natural
+    "all columns" fallback applies. Scalar values are left untouched, since a
+    blank text field (e.g. GOF expected-frequencies left empty for "uniform")
+    can be meaningful.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    cleaned = {}
+    for key, value in payload.items():
+        if isinstance(value, list):
+            filtered = [v for v in value
+                        if not (v is None or (isinstance(v, str) and v.strip() == ''))]
+            if filtered:
+                cleaned[key] = filtered
+            # else: drop the key entirely so it reads as "not provided"
+        else:
+            cleaned[key] = value
+    return cleaned
+
+
 def create_blueprint(store):
     bp = Blueprint('analysis', __name__)
 
@@ -39,7 +67,7 @@ def create_blueprint(store):
             return jsonify({"error": "No data to analyze"}), 400
         try:
             report = description.qc_numerical_dataframe(app_state.get_active_df())
-            payload = request.get_json(silent=True) or {}
+            payload = _sanitize_payload(request.get_json(silent=True) or {})
             activity_log.record(action="numerical_qc", method="numerical_qc",
                                 session_id=payload.get("session_id"))
             return jsonify(report)
@@ -56,7 +84,7 @@ def create_blueprint(store):
         if not app_state.has_data:
             return _no_data()
 
-        params = request.get_json() or {}
+        params = _sanitize_payload(request.get_json() or {})
         group_columns = [col for col in params.get('group_columns', []) if col]
         df = app_state.get_active_df()
 
@@ -99,7 +127,7 @@ def create_blueprint(store):
         if not app_state.has_data:
             return _no_data()
 
-        params = request.get_json() or {}
+        params = _sanitize_payload(request.get_json() or {})
         method = params.get('method', 'pearson')
         columns = params.get('columns') or None
         df = app_state.get_active_df()
@@ -153,7 +181,7 @@ def create_blueprint(store):
     @bp.route("/analysis/smart/<method>", methods=["POST"])
     def run_analysis_method(method):
         app_state = resolve_state(store)
-        payload = request.get_json() or {}
+        payload = _sanitize_payload(request.get_json() or {})
 
         if method not in METHODS:
             return jsonify({"error": f"Unknown method: {method}"}), 404
